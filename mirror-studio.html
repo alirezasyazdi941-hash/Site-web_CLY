@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nononick Mirror Studio</title>
+<style>
+  /* استایل پنل ادیتور */
+  :root {
+    --ui-bg: #0b1120; --ui-panel: #1e293b; --ui-border: #334155;
+    --ui-text: #f1f5f9; --ui-accent: #22c55e; --ui-muted: #94a3b8;
+  }
+  * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; }
+  body { display: flex; height: 100vh; background: var(--ui-bg); color: var(--ui-text); overflow: hidden; }
+  
+  /* پنل تنظیمات (راست) */
+  .controls { width: 320px; background: var(--ui-panel); border-left: 1px solid var(--ui-border); display: flex; flex-direction: column; overflow-y: auto; }
+  .header { padding: 15px; border-bottom: 1px solid var(--ui-border); }
+  .header h1 { font-size: 15px; color: var(--ui-accent); display: flex; align-items: center; gap: 8px; }
+  .form-group { padding: 15px; border-bottom: 1px solid var(--ui-border); }
+  label { display: block; font-size: 11px; color: var(--ui-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  input, select, textarea { width: 100%; padding: 10px; margin-bottom: 12px; background: #0f172a; border: 1px solid var(--ui-border); border-radius: 8px; color: white; font-size: 13px; outline: none; }
+  input:focus, select:focus, textarea:focus { border-color: var(--ui-accent); }
+  textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+  
+  /* پنل پیش‌نمایش و کد (چپ) */
+  .workspace { flex: 1; display: flex; flex-direction: column; background: #e2e8f0; }
+  .preview-header { background: var(--ui-panel); color: white; padding: 10px 15px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--ui-border); }
+  .preview-frame { flex: 1; width: 100%; border: none; background: #fff; }
+  .code-area { height: 30%; min-height: 150px; background: #000; color: #a5b4fc; padding: 15px; font-family: monospace; font-size: 12px; white-space: pre-wrap; direction: ltr; text-align: left; overflow-y: auto; border-top: 1px solid var(--ui-border); position: relative; }
+  .copy-btn { position: absolute; top: 10px; right: 10px; background: var(--ui-accent); color: #000; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 11px; }
+  
+  @media (max-width: 768px) {
+    body { flex-direction: column; overflow-y: auto; }
+    .controls { width: 100%; border-left: none; border-bottom: 1px solid var(--ui-border); height: auto; overflow: visible; }
+    .workspace { height: 600px; flex: none; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- پنل کنترل -->
+  <div class="controls">
+    <div class="header">
+      <h1>⚡ استودیو آینه‌ای نونونیک</h1>
+      <p style="font-size: 11px; color: var(--ui-muted); margin-top: 5px;">المان رو انتخاب کن، متن‌ها رو بنویس، کد رو کپی کن.</p>
+    </div>
+    
+    <div class="form-group">
+      <label>نوع المان (Element)</label>
+      <select id="el-type" onchange="switchElement()">
+        <option value="button">دکمه (Button)</option>
+        <option value="card">کارت شیشه‌ای (Glass Card)</option>
+        <option value="cta">بنر فراخوان (CTA)</option>
+        <option value="grid">گرید ویژگی‌ها (Features)</option>
+        <option value="text">بخش متنی (Text Section)</option>
+      </select>
+    </div>
+
+    <div class="form-group" id="dynamic-inputs">
+      <!-- فیلدها با جاوااسکریپت اینجا ساخته می‌شوند -->
+    </div>
+  </div>
+
+  <!-- پنل پیش‌نمایش و کد -->
+  <div class="workspace">
+    <div class="preview-header">
+      <span>پیش‌نمایش زنده (Live Preview)</span>
+      <span style="color: var(--ui-accent); font-weight: bold;">آینه سایت شما</span>
+    </div>
+    <iframe class="preview-frame" id="preview"></iframe>
+    <div class="code-area">
+      <button class="copy-btn" onclick="copyCode()">📋 کپی کد</button>
+      <code id="output"></code>
+    </div>
+  </div>
+
+<script>
+  // ==========================================
+  // ۱. استایل‌های اصلی سایت شما (برای شبیه‌سازی دقیق)
+  // ==========================================
+  const SITE_CSS = `
+    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800&family=Inter:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+    :root{
+      --white:#fff;--silver-100:#f6f8fb;--silver-200:#e8edf4;--silver-300:#d4dbe5;
+      --ink-900:#0a1220;--ink-800:#131c2e;--ink-700:#1e2a42;--ink-600:#33405c;--ink-500:#5a6883;
+      --cyan-100:#e6fbff;--cyan-200:#b8f2ff;--cyan-300:#6ee0f5;--cyan-400:#22c8e8;--cyan-500:#00a5c9;--cyan-600:#007d9c;
+      --orange-400:#ff8a3d;--orange-500:#ff6a1a;
+      --glass-bg:rgba(255,255,255,.55);--glass-border:rgba(255,255,255,.85);--glass-shadow:0 20px 60px -20px rgba(10,30,60,.25);
+      --font-fa:"Vazirmatn",sans-serif;
+    }
+    body { margin:0; font-family:var(--font-fa); background:var(--silver-100); color:var(--ink-800); line-height:1.65; padding:20px; }
+    .container { width:100%; max-width:1000px; margin:auto; }
+    
+    /* دکمه‌ها */
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:.6rem; padding:.95rem 1.6rem; font-size:.95rem; font-weight:600; border-radius:999px; border:1px solid transparent; cursor:pointer; text-decoration:none; transition:transform .2s; }
+    .btn--primary { background:linear-gradient(135deg,var(--orange-400),var(--orange-500)); color:#fff; box-shadow:0 10px 30px -10px rgba(255,106,26,.55); }
+    .btn--ghost { background:rgba(255,255,255,.55); border-color:rgba(255,255,255,.85); color:var(--ink-800); backdrop-filter:blur(14px); }
+    
+    /* شیشه‌ای */
+    .glass { background:var(--glass-bg); border:1px solid var(--glass-border); backdrop-filter:blur(18px) saturate(160%); border-radius:28px; box-shadow:var(--glass-shadow); }
+    
+    /* بخش‌ها */
+    .section { padding: 3rem 0; }
+    .section__title { font-size: 2rem; font-weight: 800; margin-bottom: 1rem; color: var(--ink-900); }
+    .lead { font-size: 1.1rem; color: var(--ink-600); margin-bottom: 1.5rem; }
+    .grid-3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1.5rem; }
+  `;
+
+  // ==========================================
+  // ۲. ساخت فیلدهای ورودی بر اساس نوع المان
+  // ==========================================
+  const inputsContainer = document.getElementById('dynamic-inputs');
+
+  function switchElement() {
+    const type = document.getElementById('el-type').value;
+    let html = '';
+    
+    if (type === 'button') {
+      html = `
+        <label>متن دکمه</label><input type="text" id="btn-text" value="شروع پروژه" oninput="update()">
+        <label>استایل دکمه</label>
+        <select id="btn-style" onchange="update()">
+          <option value="btn--primary">نارنجی (Primary)</option>
+          <option value="btn--ghost">شیشه‌ای (Ghost)</option>
+        </select>
+      `;
+    } else if (type === 'card') {
+      html = `
+        <label>عنوان کارت</label><input type="text" id="card-title" value="طراحی سایت" oninput="update()">
+        <label>توضیحات</label><textarea id="card-desc" oninput="update()">سایتی که فقط شما دارید.</textarea>
+        <label>آیکون (ایموجی)</label><input type="text" id="card-icon" value="💎" oninput="update()">
+      `;
+    } else if (type === 'cta') {
+      html = `
+        <label>عنوان بنر</label><input type="text" id="cta-title" value="حالا نوبت ایده شماست" oninput="update()">
+        <label>متن دکمه</label><input type="text" id="cta-btn" value="شروع پروژه" oninput="update()">
+      `;
+    } else if (type === 'grid') {
+      html = `
+        <label>تعداد آیتم‌ها (۱ تا ۴)</label>
+        <select id="grid-count" onchange="switchElement()">
+          <option value="2">۲ آیتم</option>
+          <option value="3" selected>۳ آیتم</option>
+          <option value="4">۴ آیتم</option>
+        </select>
+        <div id="grid-fields"></div>
+      `;
+    } else if (type === 'text') {
+      html = `
+        <label>عنوان بخش</label><input type="text" id="txt-title" value="درباره ما" oninput="update()">
+        <label>متن</label><textarea id="txt-body" oninput="update()">اینجا می‌توانید هر متنی که نیاز دارید را بنویسید.</textarea>
+      `;
+    }
+
+    inputsContainer.innerHTML = html;
+    
+    // اگر گرید بود، فیلدهای تکی را بساز
+    if (type === 'grid') {
+      const count = parseInt(document.getElementById('grid-count').value);
+      const gf = document.getElementById('grid-fields');
+      let fields = '';
+      for(let i=1; i<=count; i++) {
+        fields += `
+          <div style="background:#0f172a; padding:10px; border-radius:8px; margin-bottom:10px;">
+            <label>عنوان ${i}</label><input type="text" id="g-title-${i}" value="ویژگی ${i}" oninput="update()">
+            <label>آیکون ${i}</label><input type="text" id="g-icon-${i}" value="✨" oninput="update()">
+          </div>
+        `;
+      }
+      gf.innerHTML = fields;
+    }
+    
+    update();
+  }
+
+  // ==========================================
+  // ۳. تولید کد HTML و پیش‌نمایش زنده
+  // ==========================================
+  function update() {
+    const type = document.getElementById('el-type').value;
+    let generatedHTML = '';
+
+    if (type === 'button') {
+      const text = document.getElementById('btn-text').value;
+      const style = document.getElementById('btn-style').value;
+      generatedHTML = `<!-- دکمه جدید -->
+<div class="hero__cta">
+  <button class="btn ${style}" data-route="contact">${text}</button>
+</div>`;
+    } 
+    else if (type === 'card') {
+      const title = document.getElementById('card-title').value;
+      const desc = document.getElementById('card-desc').value;
+      const icon = document.getElementById('card-icon').value;
+      generatedHTML = `<!-- کارت شیشه‌ای -->
+<div class="glass" style="padding: 2rem; text-align: center;">
+  <div style="font-size: 3rem; margin-bottom: 1rem;">${icon}</div>
+  <h3 style="margin-bottom: 0.5rem; color: var(--ink-900);">${title}</h3>
+  <p style="color: var(--ink-600); margin: 0;">${desc}</p>
+</div>`;
+    }
+    else if (type === 'cta') {
+      const title = document.getElementById('cta-title').value;
+      const btnText = document.getElementById('cta-btn').value;
+      generatedHTML = `<!-- بنر فراخوان -->
+<section class="section">
+  <div class="container">
+    <div class="glass" style="padding: 3rem 2rem; text-align: center;">
+      <h2 class="section__title">${title}</h2>
+      <div class="hero__cta" style="justify-content: center; margin-top: 2rem;">
+        <button class="btn btn--primary" data-route="contact">${btnText} ←</button>
+      </div>
+    </div>
+  </div>
+</section>`;
+    }
+    else if (type === 'grid') {
+      const count = parseInt(document.getElementById('grid-count').value);
+      let items = '';
+      for(let i=1; i<=count; i++) {
+        const t = document.getElementById(`g-title-${i}`).value;
+        const ic = document.getElementById(`g-icon-${i}`).value;
+        items += `    <div class="glass" style="padding: 2rem; text-align: center;">
+      <div style="font-size: 2rem; margin-bottom: 1rem;">${ic}</div>
+      <h3 style="color: var(--ink-900);">${t}</h3>
+      <p style="color: var(--ink-600); font-size: 0.9rem;">توضیحات کوتاه برای این ویژگی.</p>
+    </div>\n`;
+      }
+      generatedHTML = `<!-- گرید ویژگی‌ها -->
+<section class="section">
+  <div class="container">
+    <div class="grid-3">
+${items}    </div>
+  </div>
+</section>`;
+    }
+    else if (type === 'text') {
+      const title = document.getElementById('txt-title').value;
+      const body = document.getElementById('txt-body').value;
+      generatedHTML = `<!-- بخش متنی -->
+<section class="section">
+  <div class="container" style="max-width: 800px;">
+    <h2 class="section__title">${title}</h2>
+    <p class="lead">${body}</p>
+  </div>
+</section>`;
+    }
+
+    // ۱. نمایش کد
+    document.getElementById('output').textContent = generatedHTML;
+
+    // ۲. آپدیت آی‌فریم پیش‌نمایش
+    const iframe = document.getElementById('preview');
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html dir="rtl">
+      <head>
+        <meta charset="utf-8">
+        <style>${SITE_CSS}</style>
+      </head>
+      <body>
+        ${generatedHTML}
+      </body>
+      </html>
+    `);
+    doc.close();
+  }
+
+  // ==========================================
+  // ۴. کپی کردن کد
+  // ==========================================
+  function copyCode() {
+    const code = document.getElementById('output').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+      const btn = document.querySelector('.copy-btn');
+      const original = btn.textContent;
+      btn.textContent = '✅ کپی شد!';
+      btn.style.background = '#fff';
+      setTimeout(() => { btn.textContent = original; btn.style.background = 'var(--ui-accent)'; }, 2000);
+    });
+  }
+
+  // اجرای اولیه
+  switchElement();
+</script>
+</body>
+</html>
